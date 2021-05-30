@@ -1,5 +1,7 @@
 package ru.example.springmvc.dao;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import ru.example.springmvc.models.Person;
 import org.springframework.stereotype.Component;
 
@@ -10,82 +12,40 @@ import java.util.List;
 @Component
 public class MyPersonDAO {
     private static int PERSON_COUNT;
-    private static final String URL="jdbc:postgresql://localhost:5432/db_name";
-    private static final String USERNAME="postgres";
-    private static final String PASSWORD="post123";
-    private static Connection connection;
-    {
-        try {
-            Class.forName("org.postgresql.Driver");
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
+    private final JdbcTemplate template;
 
-        try {
-            connection= DriverManager.getConnection(URL,USERNAME,PASSWORD);
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
-        }
+    @Autowired
+    public MyPersonDAO(JdbcTemplate template) {
+        this.template = template;
     }
 
 
-    public void addNewPerson(Person person) throws SQLException {
-        PreparedStatement st = connection.prepareStatement("insert into person values(?,?,?,?,?)");
-        st.setInt(1,++PERSON_COUNT);
-        st.setString(2,person.getName());
-        st.setString(3,person.getSurname());
-        st.setInt(4,person.getAge());
-        st.setString(5,person.getEmail());
-        st.executeUpdate();
+    public void addNewPerson(Person person) {
+        template.update("insert into person values(?,?,?,?,?)",new Object[]{person.getId(),
+        person.getName(),
+        person.getSurname(),
+        person.getAge(),
+        person.getEmail()});
     }
 
-    public List<Person> getPeople() throws SQLException {
-
-        List<Person> people =new ArrayList<>();
-        Statement statement=connection.createStatement();
-        String SQL="select * from person";
-        ResultSet set = statement.executeQuery(SQL);
-        while (set.next()){
-            Person person = new Person();
-            person.setId(set.getInt("id"));
-            person.setName(set.getString("name"));
-            person.setSurname(set.getString("surname"));
-            person.setAge(set.getInt("age"));
-            person.setEmail(set.getString("email"));
-            people.add(person);
-        }
-        PERSON_COUNT=people.size();
-        return people;
+    public List<Person> getPeople() {
+        return template.query("select * from person",new PersonMapper());
     }
 
     public Person getPerson(int id) throws SQLException {
-        Person person = new Person();
-        PreparedStatement st = connection.prepareStatement("select * from person where id=?");
-        st.setInt(1,id);
-        ResultSet set = st.executeQuery();
-        set.next();
-        System.out.println("id="+id+"\n"+"name="+set.getString("name"));
-        person.setId(id);
-        person.setName(set.getString("name"));
-        person.setSurname(set.getString("surname"));
-        person.setAge(set.getInt("age"));
-        person.setEmail(set.getString("email"));
-        return person;
+        return template.query("select * from person where id=?",new Object[]{id},new PersonMapper()).stream().findAny().orElse(null);
     }
 
     public void update(Person updatedPerson,int id) throws SQLException {
-        PreparedStatement st = connection.prepareStatement("update person set name=?, surname=?, age=?, email=? where id=?");
-        st.setString(1,updatedPerson.getName());
-        st.setString(2,updatedPerson.getSurname());
-        st.setInt(3,updatedPerson.getAge());
-        st.setString(4,updatedPerson.getEmail());
-        st.setInt(5,id);
-        st.executeUpdate();
+        template.update("update person set name=?, surname=?, age=?, email=? where id=?",
+                new Object[]{updatedPerson.getName(),
+                        updatedPerson.getSurname(),
+                        updatedPerson.getAge(),
+                        updatedPerson.getEmail(),
+                        id});
     }
 
     public void deletePerson(int id) throws SQLException {
-        PreparedStatement st = connection.prepareStatement("delete from person where id=?");
-        st.setInt(1,id);
-        st.executeUpdate();
+        template.update("delete from person where id=?",new Object[]{id});
     }
 }
